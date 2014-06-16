@@ -76,3 +76,60 @@ put "#{APIPREFIX}/users/:user_id" do |user_id|
     user.to_hash.to_json
   end
 end
+
+get "#{APIPREFIX}/users/:user_id/social_stats" do |user_id|
+  begin
+    return {}.to_json if not params["course_id"]
+
+    course_id = params["course_id"]
+
+    # get all metadata regarding forum content, but don't bother to fetch the body
+    # as we don't need it and we shouldn't push all that data over the wire
+    content = Content.where(author_id: user_id, course_id: course_id).without(:body)
+
+    num_threads = 0
+    num_comments = 0
+    num_replies = 0
+    num_upvotes = 0
+    num_downvotes = 0
+    num_flagged = 0
+    num_comments_generated = 0
+
+    thread_ids = []
+
+    content.each do |item|
+      if item._type == "CommentThread" then
+        num_threads += 1
+        thread_ids.push(item._id)
+        num_comments_generated += item.comment_count
+      elsif item._type == "Comment" and item.parent_ids == [] then
+        num_comments += 1
+      else
+        num_replies += 1
+      end
+
+      # don't allow for self-voting
+      item.votes["up"].delete(user_id)
+      item.votes["down"].delete(user_id)
+
+      num_upvotes += item.votes["up"].count
+      num_downvotes += item.votes["down"].count
+
+      num_flagged += item.abuse_flaggers.count
+    end
+
+    # with the array of objectId's for threads, get a count of number of other users who have a subscription on it
+    num_thread_followers = Subscription.where(:subscriber_id.ne => user_id, :source_id.in => thread_ids).count()
+
+    {
+      num_threads: num_threads,
+      num_comments: num_comments,
+      num_replies: num_replies,
+      num_upvotes: num_upvotes,
+      num_downvotes: num_downvotes,
+      num_flagged: num_flagged,
+      num_thread_followers: num_thread_followers,
+      num_comments_generated: num_comments_generated
+    }.to_json
+  end
+end
