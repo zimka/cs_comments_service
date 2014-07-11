@@ -67,6 +67,10 @@ describe "app" do
           @threads["t2"].save!
           rs = thread_result course_id: "omg", group_ids: "100,101", sort_order: "asc"
           rs.length.should == 2
+          rs.each_with_index { |res, i|
+            check_thread_result_json(nil, @threads["t#{i+1}"], res)
+            res["course_id"].should == "omg"
+          }
         end
         it "returns only threads where course id and group id match or group id is nil" do
           @threads["t1"].course_id = "omg"

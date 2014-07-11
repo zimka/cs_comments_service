@@ -127,7 +127,8 @@ describe "app" do
 
         it "by group_ids" do
           get "/api/v1/search/threads", text: "text", group_ids: "1,2"
-          expected_ids = (0..29).find_all {|i| i % 5 == 0 || i % 5 == 1 || i % 5 == 2}
+          expected_ids = (0..29).find_all {|i| i % 5 == 0 || i % 5 == 1}
+          expected_ids.concat((0..29).find_all {|i| i % 5 == 2})
           assert_response_contains(expected_ids)
         end
 
