@@ -83,16 +83,25 @@ get "#{APIPREFIX}/users/:user_id/social_stats" do |user_id|
 
     course_id = params["course_id"]
 
+    user_stats = {}
+    thread_ids = {}
+
     # get all metadata regarding forum content, but don't bother to fetch the body
     # as we don't need it and we shouldn't push all that data over the wire
     if user_id == "*" then
       content = Content.where(course_id: course_id).without(:body)
     else
       content = Content.where(author_id: user_id, course_id: course_id).without(:body)
+      user_stats[user_id] = {
+        "num_threads" => 0,
+        "num_comments" => 0,
+        "num_replies" => 0,
+        "num_upvotes" => 0,
+        "num_downvotes" => 0,
+        "num_flagged" => 0,
+        "num_comments_generated" => 0
+      }
     end
-
-    user_stats = {}
-    thread_ids = {}
 
     content.each do |item|
       user_id = item.author_id
