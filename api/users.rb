@@ -104,6 +104,7 @@ get "#{APIPREFIX}/users/:user_id/social_stats" do |user_id|
         "num_flagged" => 0,
         "num_comments_generated" => 0
       }
+      thread_ids[user_id] = []
     end
 
     content.each do |item|
@@ -119,7 +120,6 @@ get "#{APIPREFIX}/users/:user_id/social_stats" do |user_id|
           "num_flagged" => 0,
           "num_comments_generated" => 0
         }
-
         thread_ids[user_id] = []
       end
 
