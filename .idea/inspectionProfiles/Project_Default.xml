@@ -1,0 +1,36 @@
+<component name="InspectionProjectProfileManager">
+  <profile version="1.0" is_locked="false">
+    <option name="myName" value="Project Default" />
+    <option name="myLocal" value="false" />
+    <inspection_tool class="PyPackageRequirementsInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredPackages">
+        <value>
+          <list size="3">
+            <item index="0" class="java.lang.String" itemvalue="distribute" />
+            <item index="1" class="java.lang.String" itemvalue="lxml" />
+            <item index="2" class="java.lang.String" itemvalue="nosedjango" />
+          </list>
+        </value>
+      </option>
+    </inspection_tool>
+    <inspection_tool class="PyUnresolvedReferencesInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredIdentifiers">
+        <value>
+          <list size="3">
+            <item index="0" class="java.lang.String" itemvalue="xblock.runtime.LmsUser.anonymous_student_id" />
+            <item index="1" class="java.lang.String" itemvalue="xblock.runtime.LmsUser.get_real_user" />
+            <item index="2" class="java.lang.String" itemvalue="xblock.runtime.LmsCourse.course_id" />
+          </list>
+        </value>
+      </option>
+    </inspection_tool>
+    <inspection_tool class="TaskInspection" enabled="true" level="INFO" enabled_by_default="true">
+      <option name="suppressedTasks">
+        <set>
+          <option value="CoffeeScript" />
+          <option value="HAML" />
+        </set>
+      </option>
+    </inspection_tool>
+  </profile>
+</component>

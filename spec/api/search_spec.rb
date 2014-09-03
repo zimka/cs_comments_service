@@ -132,6 +132,12 @@ describe "app" do
           assert_response_contains(expected_ids)
         end
 
+        it "with exclude_groups" do
+          get "/api/v1/search/threads", text: "text", exclude_groups: "true"
+          expected_ids = (0..29).find_all {|i| i % 5 == 0}
+          assert_response_contains(expected_ids)
+        end
+
         it "by all filters combined" do
           get "/api/v1/search/threads", text: "text", course_id: "test/course/id0", commentable_id: "commentable0", group_id: "1"
           assert_response_contains([0, 6])
