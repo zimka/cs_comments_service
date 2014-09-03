@@ -3,9 +3,13 @@ get "#{APIPREFIX}/threads" do # retrieve threads by course
   threads = Content.where({"_type" => "CommentThread", "course_id" => params["course_id"]})
   if params[:commentable_ids]
     threads = threads.in({"commentable_id" => params[:commentable_ids].split(",")})
+  end
   #if a group id is sent, then process the set of threads with that group id or with no group id
   group_ids = get_group_ids_from_params(params)
-  if not group_ids.empty?
+  exclude_groups = value_to_boolean(params['exclude_groups'])
+  if exclude_groups
+    threads = threads.where({"group_id" => {"$exists" => false}})
+  elsif not group_ids.empty?
     threads = threads.any_of(
       {:group_id.in => group_ids},
       {:group_id.exists => false},

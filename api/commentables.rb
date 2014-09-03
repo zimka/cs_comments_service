@@ -7,7 +7,7 @@ get "#{APIPREFIX}/:commentable_id/threads" do |commentable_id|
   threads = Content.where({"_type" => "CommentThread", "commentable_id" => commentable_id})
   if params["course_id"]
     threads = threads.where({"course_id" => params["course_id"]})
-  threads = Content.where(_type:"CommentThread", commentable_id: commentable_id)
+  end
   group_ids = get_group_ids_from_params(params)
   if not group_ids.empty?
     threads = threads.any_of(

@@ -1,5 +1,6 @@
 get "#{APIPREFIX}/search/threads" do
   local_params = params # Necessary for params to be available inside blocks
+  local_params['exclude_groups'] = value_to_boolean(local_params['exclude_groups'])
   group_ids = get_group_ids_from_params(local_params)
   context = local_params["context"] ? local_params["context"] : "course"
   search_text = local_params["text"]
@@ -27,7 +28,9 @@ get "#{APIPREFIX}/search/threads" do
                 {:term => {:context => context}}
               ]
 
-              if not group_ids.empty?
+              if local_params['exclude_groups']
+                filter :not, :exists => {:field => :group_id}
+              elsif not group_ids.empty?
                 if group_ids.length > 1
                   group_id_criteria = {:terms => {:group_id => group_ids}}
                 else
