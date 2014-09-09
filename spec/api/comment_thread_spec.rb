@@ -563,7 +563,6 @@ describe "app" do
         response["num_active_threads"].should == 3
       end
 
-
       it "marks thread as read and confirms its value on returned response" do
         user = create_test_user(123)
         thread = CommentThread.first
