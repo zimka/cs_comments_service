@@ -1,3 +1,6 @@
+require 'new_relic/agent/method_tracer'
+require 'date'
+
 post "#{APIPREFIX}/users" do
   user = User.new(external_id: params["id"])
   user.username = params["username"]
@@ -84,6 +87,9 @@ get "#{APIPREFIX}/users/:user_id/social_stats" do |user_id|
   begin
     return {}.to_json if not params["course_id"]
 
+    # parse the optional "end" date filter passed in by the caller
+    end_date = DateTime.iso8601(params["end_date"]) if params["end_date"]
+
     course_id = params["course_id"]
 
     user_stats = {}
@@ -92,9 +98,17 @@ get "#{APIPREFIX}/users/:user_id/social_stats" do |user_id|
     # get all metadata regarding forum content, but don't bother to fetch the body
     # as we don't need it and we shouldn't push all that data over the wire
     if user_id == "*" then
-      content = Content.where(course_id: course_id, anonymous: false, anonymous_to_peers: false).without(:body)
+      if end_date then
+        content = Content.where(course_id: course_id, anonymous: false, anonymous_to_peers: false, :created_at.lte => (end_date)).without(:body)
+      else
+        content = Content.where(course_id: course_id, anonymous: false, anonymous_to_peers: false).without(:body)
+      end
     else
-      content = Content.where(author_id: user_id, course_id: course_id, anonymous: false, anonymous_to_peers: false).without(:body)
+      if end_date then
+        content = Content.where(author_id: user_id, course_id: course_id, anonymous: false, anonymous_to_peers: false, :created_at.lte => (end_date)).without(:body)
+      else
+        content = Content.where(author_id: user_id, course_id: course_id, anonymous: false, anonymous_to_peers: false).without(:body)
+      end
       user_stats[user_id] = {
         "num_threads" => 0,
         "num_comments" => 0,
@@ -145,7 +159,11 @@ get "#{APIPREFIX}/users/:user_id/social_stats" do |user_id|
 
     # with the array of objectId's for threads, get a count of number of other users who have a subscription on it
     user_stats.keys.each do |user_id|
-      user_stats[user_id]["num_thread_followers"] = Subscription.where(:subscriber_id.ne => user_id, :source_id.in => thread_ids[user_id]).count()
+      if end_date then
+        user_stats[user_id]["num_thread_followers"] = Subscription.where(:subscriber_id.ne => user_id, :source_id.in => thread_ids[user_id], :created_at.lte => (end_date)).count()
+      else
+        user_stats[user_id]["num_thread_followers"] = Subscription.where(:subscriber_id.ne => user_id, :source_id.in => thread_ids[user_id]).count()
+      end
     end
 
     user_stats.to_json
