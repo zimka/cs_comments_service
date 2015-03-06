@@ -89,26 +89,20 @@ get "#{APIPREFIX}/users/:user_id/social_stats" do |user_id|
 
     # parse the optional "end" date filter passed in by the caller
     end_date = DateTime.iso8601(params["end_date"]) if params["end_date"]
+    thread_type = params["thread_type"]
 
     course_id = params["course_id"]
 
     user_stats = {}
     thread_ids = {}
 
-    # get all metadata regarding forum content, but don't bother to fetch the body
-    # as we don't need it and we shouldn't push all that data over the wire
-    if user_id == "*" then
-      if end_date then
-        content = Content.where(course_id: course_id, anonymous: false, anonymous_to_peers: false, :created_at.lte => (end_date)).without(:body)
-      else
-        content = Content.where(course_id: course_id, anonymous: false, anonymous_to_peers: false).without(:body)
-      end
-    else
-      if end_date then
-        content = Content.where(author_id: user_id, course_id: course_id, anonymous: false, anonymous_to_peers: false, :created_at.lte => (end_date)).without(:body)
-      else
-        content = Content.where(author_id: user_id, course_id: course_id, anonymous: false, anonymous_to_peers: false).without(:body)
-      end
+    content_selector = {course_id: course_id, anonymous: false, anonymous_to_peers: false}
+    if end_date
+      content_selector[:created_at.lte] = end_date
+    end
+
+    if user_id != '*'
+      content_selector["author_id"] = user_id
       user_stats[user_id] = {
         "num_threads" => 0,
         "num_comments" => 0,
@@ -119,6 +113,25 @@ get "#{APIPREFIX}/users/:user_id/social_stats" do |user_id|
         "num_comments_generated" => 0
       }
       thread_ids[user_id] = []
+    end
+
+    # get all metadata regarding forum content, but don't bother to fetch the body
+    # as we don't need it and we shouldn't push all that data over the wire
+    content = Content.where(content_selector).without(:body)
+
+    if thread_type
+      thread_selector = {course_id: course_id, anonymous: false, anonymous_to_peers: false}
+      if end_date
+        thread_selector[:created_at.lte] = end_date
+      end
+      if thread_type
+        thread_selector["thread_type"] = thread_type
+      end
+
+      target_threads = CommentThread.where(thread_selector).only(:_id).map(&:_id)
+      content = content.select do |c|
+        (c._type == "CommentThread" && c.thread_type == thread_type) || target_threads.include?(c.comment_thread_id)
+      end
     end
 
     content.each do |item|

@@ -42,7 +42,7 @@ describe "app" do
       end
       it "returns error if new information has conflict with other users" do
         put "/api/v1/users/1", username: "user2"
-        last_response.status.should == 400 
+        last_response.status.should == 400
       end
     end
     describe "GET /api/v1/users/:user_id" do
@@ -190,7 +190,7 @@ describe "app" do
         end
 
         it "only returns threads with non-standalone activity from the specified user"  do
-          # `setup_10_threads` creates a thread "t3" and 5 comments all owned by user 103 
+          # `setup_10_threads` creates a thread "t3" and 5 comments all owned by user 103
           # we are hijacking a course thread comment owned by user 103 and making it owned
           # by user 100 instead, so this user has a comment on someone else's thread
           @comments["t3 c4"].author = @users["u100"]
@@ -251,7 +251,7 @@ describe "app" do
         rs = thread_result 100, course_id: "xyz"
         rs.length.should == 1
         check_thread_result_json(@users["u100"], @threads["t0"], rs.first)
-      end      
+      end
 
       it "only returns threads from the specified course" do
         @threads.each do |k, v|
@@ -315,7 +315,7 @@ describe "app" do
           result["page"].should == 2
         end
         it "orders correctly across pages" do
-          expected_order = @threads.keys.reverse 
+          expected_order = @threads.keys.reverse
           actual_order = []
           per_page = 3
           num_pages = (@threads.length + per_page - 1) / per_page
@@ -378,5 +378,313 @@ describe "app" do
       end
     end
 
+    describe "GET /api/v1/users/:user_id/social_stats" do
+      before :each do
+        User.delete_all
+        Content.all.delete
+        @user1 = create_test_user 1
+        @user2 = create_test_user 2
+        @user3 = create_test_user 3
+        @user4 = create_test_user 4
+      end
+
+      def check_social_stats(response, excpected)
+        excpected.each do |key, value|
+          response[key].should == value
+        end
+      end
+
+      def make_social_stats(
+        num_threads, num_comments, num_replies, num_upvotes,
+        num_downvotes, num_flagged, num_comments_generated, num_thread_followers
+      )
+        {
+          "num_threads" => num_threads,
+          "num_comments" => num_comments,
+          "num_replies" => num_replies,
+          "num_upvotes" => num_upvotes,
+          "num_downvotes" => num_downvotes,
+          "num_flagged" => num_flagged,
+          "num_comments_generated" => num_comments_generated,
+          "num_thread_followers" => num_thread_followers
+        }
+      end
+
+      def make_request(user_id, course_id, end_date=nil, thread_type=nil)
+        parameters = { :course_id => course_id}
+        if end_date
+          parameters['end_date'] = end_date
+        end
+        if thread_type
+          parameters['thread_type'] = thread_type
+        end
+
+        get "/api/v1/users/#{user_id}/social_stats", parameters
+
+        last_response.status.should == 200
+        parse(last_response.body)
+      end
+
+      def set_votes(user, direction, contents)
+        contents.each do |content|
+          content.votes[direction].push(user.id)
+          content.save!
+        end
+      end
+
+      def set_flags(user, contents)
+        contents.each do |content|
+          content.abuse_flaggers.push(user.id)
+          content.save!
+        end
+      end
+
+      def subscribe(content, users)
+        users.each do |user|
+          user.subscribe(content)
+        end
+      end
+
+      it "returns nothing for missing course" do
+        get "/api/v1/users/1/social_stats"
+        last_response.status.should == 200
+        res = parse(last_response.body)
+        res.should == {}
+
+        get "/api/v1/users/1/social_stats", course: "missing_course"
+        last_response.status.should == 200
+        res = parse(last_response.body)
+        res.should == {}
+
+        get "/api/v1/users/*/social_stats", course: "missing_course"
+        last_response.status.should == 200
+        res = parse(last_response.body)
+        res.should == {}
+      end
+
+      describe "single user" do
+        it "returns zeroes for missing user" do
+          check_social_stats(make_request(10000, DFLT_COURSE_ID), {"10000" => make_social_stats(0,0,0,0,0,0,0,0)})
+        end
+
+        it "returns zeroes for existing user with no activity" do
+          thread = make_thread(@user1, "irrelevant text", DFLT_COURSE_ID, "irrelevant commentable_id")
+          check_social_stats(make_request(@user2.id, DFLT_COURSE_ID), {@user2.id => make_social_stats(0,0,0,0,0,0,0,0)})
+        end
+
+        [1,2].each do |thread_count|
+          [0,3].each do |comment_count|
+            [2,0,4].each do |reply_count|
+              it "returns correct thread, comment, reply and comments generated count (#{thread_count}, #{comment_count}, #{reply_count})" do
+                check_social_stats(make_request(@user2.id, DFLT_COURSE_ID), {@user2.id => make_social_stats(0,0,0,0,0,0,0,0)})
+
+                fixed_thread = make_thread(@user2, "Fixed thread", DFLT_COURSE_ID, "fixed_thread")
+                fixed_comment = make_comment(@user2, fixed_thread, "fixed comemnt text")
+
+                check_social_stats(make_request(@user2.id, DFLT_COURSE_ID), {@user2.id => make_social_stats(1,1,0,0,0,0,1,0)})
+
+                thread_count.times {|i| make_thread(@user1, "text#{i}", DFLT_COURSE_ID, "commentable_id#{i}") }
+                comment_count.times {|i|  make_comment(@user1, fixed_thread, "comment#{i}") }
+                reply_count.times {|i| make_comment(@user1, fixed_comment, "response#{i}")}
+
+                # precondition - checking that user2 has only one thread and one comment - the fixed ones
+                check_social_stats(make_request(@user2.id, DFLT_COURSE_ID), {@user2.id => make_social_stats(1,1,0,0,0,0,comment_count+reply_count+1,0)})
+
+                check_social_stats(make_request(@user1.id, DFLT_COURSE_ID), {@user1.id => make_social_stats(thread_count,comment_count,reply_count,0,0,0,0,0)})
+              end
+            end
+          end
+        end
+
+        it "self-comments and self-replies are counted toward generated_comments" do
+          thread = make_thread(@user1, "Some thread", DFLT_COURSE_ID, "Thread 1")
+          comment = make_comment(@user1, thread, "Comment1-1")
+          reply = make_comment(@user1, comment, "Reply1-1-1")
+
+          check_social_stats(make_request(@user1.id, DFLT_COURSE_ID), {@user1.id => make_social_stats(1,1,1,0,0,0,2,0)})
+        end
+
+        it "returns correct upvotes and downvotes count" do
+          thread1 = make_thread(@user2, "Some thread", DFLT_COURSE_ID, "Thread 1")
+          thread2 = make_thread(@user2, "Some other thread", DFLT_COURSE_ID, "Thread 2")
+          comment1 = make_comment(@user2, thread1, "Comment1-1")
+          comment2 = make_comment(@user2, thread1, "Comment1-2")
+          reply1 = make_comment(@user2, comment1, "Reply1-1-1")
+          reply2 = make_comment(@user2, comment2, "Reply1-2-1")
+
+          set_votes(@user1, "up", [thread1, comment2, reply2])
+          set_votes(@user1, "down", [thread2, comment1])
+          set_flags(@user1, [thread1, thread2, comment1, reply2])
+
+          check_social_stats(make_request(@user2.id, DFLT_COURSE_ID), {@user2.id => make_social_stats(2,2,2,3,2,4,4,0)})
+        end
+
+        it "ignores self-upvotes and self-downvotes" do
+          thread = make_thread(@user1, "Some thread", DFLT_COURSE_ID, "Thread 1")
+          comment = make_comment(@user1, thread, "Comment1-1")
+          reply = make_comment(@user1, comment, "Reply1-1-1")
+
+          set_votes(@user1, "up", [thread, comment, reply])
+          set_votes(@user1, "down", [thread, comment, reply])
+
+          check_social_stats(make_request(@user1.id, DFLT_COURSE_ID), {@user1.id => make_social_stats(1,1,1,0,0,0,2,0)})
+        end
+
+        it "returns correct follower count" do
+          thread = make_thread(@user1, "Some thread", DFLT_COURSE_ID, "Thread 1")
+
+          subscribe(thread, [@user2, @user3])
+
+          check_social_stats(make_request(@user1.id, DFLT_COURSE_ID), {@user1.id => make_social_stats(1,0,0,0,0,0,0,2)})
+        end
+
+        it "ignores self-subscriptions" do
+          thread = make_thread(@user1, "Some thread", DFLT_COURSE_ID, "Thread 1")
+
+          subscribe(thread, [@user1])
+
+          check_social_stats(make_request(@user1.id, DFLT_COURSE_ID), {@user1.id => make_social_stats(1,0,0,0,0,0,0,0)})
+        end
+
+        it "ignores subscriptions to comments and replies" do
+          thread = make_thread(@user1, "Some thread", DFLT_COURSE_ID, "Thread 1")
+          comment = make_comment(@user1, thread, "Comment1-1")
+          reply = make_comment(@user1, comment, "Reply1-1-1")
+
+          subscribe(comment, [@user2])
+          subscribe(reply, [@user2])
+
+          check_social_stats(make_request(@user1.id, DFLT_COURSE_ID), {@user1.id => make_social_stats(1,1,1,0,0,0,2,0)})
+        end
+
+        it "respects end_date parameter when calculating thread, comment, reply and comments generated counts" do
+          thread1 = make_thread(@user1, "Some thread", DFLT_COURSE_ID, "Thread 1")
+          thread2 = make_thread(@user1, "Other thread", DFLT_COURSE_ID, "Thread 2")
+          comment1 = make_comment(@user1, thread1, "Comment1-1")
+          comment2 = make_comment(@user1, thread1, "Comment1-2")
+          reply1 = make_comment(@user1, comment1, "Reply1-1-1")
+          reply2 = make_comment(@user1, comment1, "Reply1-1-2")
+
+          [thread1, comment1, reply1].each do |content|
+            content.created_at = DateTime.new(2015, 02, 28)
+            content.save!
+          end
+
+          [thread2, comment2, reply2].each do |content|
+            content.created_at = DateTime.new(2015, 03, 12)
+            content.save!
+          end
+
+          check_social_stats(make_request(@user1.id, DFLT_COURSE_ID), {@user1.id => make_social_stats(2,2,2,0,0,0,4,0)})
+          # TODO: looks like a bug, but preserving it for now; comments generated should probably be 2, as comment1 and reply1 were created after end_date
+          check_social_stats(make_request(@user1.id, DFLT_COURSE_ID, DateTime.new(2015, 03, 01)), {@user1.id => make_social_stats(1,1,1,0,0,0,4,0)})
+          check_social_stats(make_request(@user1.id, DFLT_COURSE_ID, DateTime.new(2015, 02, 01)), {@user1.id => make_social_stats(0,0,0,0,0,0,0,0)})
+        end
+
+        it "respects thread_type parameter when calculating thread, comment, reply and comments generated counts" do
+          thread1 = make_thread(@user1, "Some thread", DFLT_COURSE_ID, "Thread 1", :discussion)
+          thread2 = make_thread(@user1, "Other thread", DFLT_COURSE_ID, "Thread 2", :question)
+          comment1 = make_comment(@user1, thread1, "Comment1-1")
+          comment2 = make_comment(@user1, thread2, "Comment2-1")
+          comment3 = make_comment(@user1, thread2, "Comment2-2")
+          reply1 = make_comment(@user1, comment1, "Reply1-1-1")
+          reply2 = make_comment(@user1, comment2, "Reply1-2-1")
+
+          check_social_stats(make_request(@user1.id, DFLT_COURSE_ID, nil), {@user1.id => make_social_stats(2,3,2,0,0,0,5,0)})
+          check_social_stats(make_request(@user1.id, DFLT_COURSE_ID, nil, :discussion), {@user1.id => make_social_stats(1,1,1,0,0,0,2,0)})
+          check_social_stats(make_request(@user1.id, DFLT_COURSE_ID, nil, :question), {@user1.id => make_social_stats(1,2,1,0,0,0,3,0)})
+        end
+      end
+
+      describe "all users" do
+        before :each do
+          @thread1 = make_thread(@user1, "Some thread", DFLT_COURSE_ID, "Thread 1", :discussion)
+          @thread2 = make_thread(@user2, "Other thread", DFLT_COURSE_ID, "Thread 2", :discussion)
+          @thread3 = make_thread(@user2, "Other thread", DFLT_COURSE_ID, "Thread 2", :question)
+          @comment1 = make_comment(@user2, @thread1, "Comment1-1")
+          @comment2 = make_comment(@user2, @thread1, "Comment1-2")
+          @comment3 = make_comment(@user2, @thread2, "Comment2-1")
+          @comment4 = make_comment(@user1, @thread3, "Comment3-1")
+          @reply1 = make_comment(@user1, @comment1, "Reply1-1-1")
+          @reply2 = make_comment(@user2, @comment1, "Reply1-1-2")
+          @reply3 = make_comment(@user1, @comment2, "Reply1-2-1")
+
+          set_votes(@user1, "up", [@thread2, @comment2, @comment3])
+          set_votes(@user2, "up", [@thread1, @reply1])
+          set_votes(@user3, "up", [@thread1, @thread2, @thread3])
+
+          set_flags(@user1, [@comment1, @comment2, @comment4])
+          set_flags(@user2, [@thread1, @reply1])
+          set_flags(@user3, [@thread1, @thread2])
+
+          subscribe(@thread1, [@user3])
+          subscribe(@thread2, [@user1, @user3])
+          subscribe(@thread3, [@user1])
+        end
+
+        it "returns correct stats for all users" do
+          check_social_stats(make_request('*', DFLT_COURSE_ID), {
+            @user1.id => make_social_stats(1,1,2,3,0,4,5,1),
+            @user2.id => make_social_stats(2,3,1,5,0,3,2,3),
+          })
+        end
+
+        it "filters by end_date" do
+          [@thread1, @comment1, @reply1].each do |content|
+            content.created_at = DateTime.new(2015, 02, 28)
+            content.save!
+          end
+
+          [@thread2, @comment2, @reply2].each do |content|
+            content.created_at = DateTime.new(2015, 03, 12)
+            content.save!
+          end
+
+          [@thread3, @comment3, @reply3, @comment4].each do |content|
+            content.created_at = DateTime.new(2015, 03, 15)
+            content.save!
+          end
+
+          check_social_stats(make_request('*', DFLT_COURSE_ID), {
+            @user1.id => make_social_stats(1,1,2,3,0,4,5,1),
+            @user2.id => make_social_stats(2,3,1,5,0,3,2,3),
+          })
+
+          make_request('*', DFLT_COURSE_ID, DateTime.new(2015, 02, 01)).should == {}
+
+          check_social_stats(make_request('*', DFLT_COURSE_ID, DateTime.new(2015, 03, 01)), {
+            @user1.id => make_social_stats(1,0,1,3,0,3,5,0),
+            @user2.id => make_social_stats(0,1,0,0,0,1,0,0),
+          })
+
+          check_social_stats(make_request('*', DFLT_COURSE_ID, DateTime.new(2015, 03, 13)), {
+            @user1.id => make_social_stats(1,0,1,3,0,3,5,1),
+            @user2.id => make_social_stats(1,2,1,3,0,3,1,2),
+          })
+
+          check_social_stats(make_request('*', DFLT_COURSE_ID, DateTime.new(2015, 03, 25)), {
+            @user1.id => make_social_stats(1,1,2,3,0,4,5,1),
+            @user2.id => make_social_stats(2,3,1,5,0,3,2,3),
+          })
+        end
+
+        it "filters by thread_type" do
+          check_social_stats(make_request('*', DFLT_COURSE_ID, nil), {
+            @user1.id => make_social_stats(1,1,2,3,0,4,5,1),
+            @user2.id => make_social_stats(2,3,1,5,0,3,2,3),
+          })
+
+          check_social_stats(make_request('*', DFLT_COURSE_ID, nil, :discussion), {
+            @user1.id => make_social_stats(1,0,2,3,0,3,5,1),
+            @user2.id => make_social_stats(1,3,1,4,0,3,1,2),
+          })
+
+          check_social_stats(make_request('*', DFLT_COURSE_ID, nil, :question), {
+            @user1.id => make_social_stats(0,1,0,0,0,1,0,0),
+            @user2.id => make_social_stats(1,0,0,1,0,0,1,1),
+          })
+        end
+      end
+    end
   end
 end
