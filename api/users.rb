@@ -95,14 +95,14 @@ get "#{APIPREFIX}/users/:user_id/social_stats" do |user_id|
 
     user_stats = {}
     thread_ids = {}
+    flat_thread_ids = []
 
     content_selector = {course_id: course_id, anonymous: false, anonymous_to_peers: false}
     if end_date
       content_selector[:created_at.lte] = end_date
     end
 
-    if user_id != '*'
-      content_selector["author_id"] = user_id
+    def set_template_result(user_id, user_stats, thread_ids)
       user_stats[user_id] = {
         "num_threads" => 0,
         "num_comments" => 0,
@@ -110,9 +110,16 @@ get "#{APIPREFIX}/users/:user_id/social_stats" do |user_id|
         "num_upvotes" => 0,
         "num_downvotes" => 0,
         "num_flagged" => 0,
-        "num_comments_generated" => 0
+        "num_comments_generated" => 0,
+        "num_thread_followers" => 0,
+        "num_threads_read" => 0,
       }
       thread_ids[user_id] = []
+    end
+
+    if user_id != '*'
+      content_selector["author_id"] = user_id
+      set_template_result(user_id, user_stats, thread_ids)
     end
 
     # get all metadata regarding forum content, but don't bother to fetch the body
@@ -138,21 +145,13 @@ get "#{APIPREFIX}/users/:user_id/social_stats" do |user_id|
       user_id = item.author_id
 
       if user_stats.key?(user_id) == false then
-        user_stats[user_id] = {
-          "num_threads" => 0,
-          "num_comments" => 0,
-          "num_replies" => 0,
-          "num_upvotes" => 0,
-          "num_downvotes" => 0,
-          "num_flagged" => 0,
-          "num_comments_generated" => 0
-        }
-        thread_ids[user_id] = []
+        set_template_result(user_id, user_stats, thread_ids)
       end
 
       if item._type == "CommentThread" then
         user_stats[user_id]["num_threads"] += 1
         thread_ids[user_id].push(item._id)
+        flat_thread_ids.push(item._id)
         user_stats[user_id]["num_comments_generated"] += item.comment_count
       elsif item._type == "Comment" and item.parent_ids == [] then
         user_stats[user_id]["num_comments"] += 1
@@ -168,6 +167,7 @@ get "#{APIPREFIX}/users/:user_id/social_stats" do |user_id|
       user_stats[user_id]["num_downvotes"] += item.votes["down"].count
 
       user_stats[user_id]["num_flagged"] += item.abuse_flaggers.count
+
     end
 
     # with the array of objectId's for threads, get a count of number of other users who have a subscription on it
@@ -177,6 +177,15 @@ get "#{APIPREFIX}/users/:user_id/social_stats" do |user_id|
       else
         user_stats[user_id]["num_thread_followers"] = Subscription.where(:subscriber_id.ne => user_id, :source_id.in => thread_ids[user_id]).count()
       end
+    end
+
+    # Get the number of threads read by each user.
+    users = User.only([:_id, :read_states]).where("read_states.course_id" => course_id)
+    users.each do |user|
+      if user_stats.key?(user._id) == false then
+        set_template_result(user._id, user_stats, thread_ids)
+      end
+      user_stats[user._id]["num_threads_read"] = user.read_states.find_by(:course_id => course_id).last_read_times.length
     end
 
     user_stats.to_json
