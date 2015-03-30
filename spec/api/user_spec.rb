@@ -336,15 +336,16 @@ describe "app" do
         @user4 = create_test_user 4
       end
 
-      def check_social_stats(response, excpected)
-        excpected.each do |key, value|
+      def check_social_stats(response, expected)
+        expected.each do |key, value|
           response[key].should == value
         end
       end
 
       def make_social_stats(
         num_threads, num_comments, num_replies, num_upvotes,
-        num_downvotes, num_flagged, num_comments_generated, num_thread_followers
+        num_downvotes, num_flagged, num_comments_generated, num_thread_followers,
+        num_threads_read
       )
         {
           "num_threads" => num_threads,
@@ -354,7 +355,8 @@ describe "app" do
           "num_downvotes" => num_downvotes,
           "num_flagged" => num_flagged,
           "num_comments_generated" => num_comments_generated,
-          "num_thread_followers" => num_thread_followers
+          "num_thread_followers" => num_thread_followers,
+          "num_threads_read" => num_threads_read,
         }
       end
 
@@ -412,33 +414,33 @@ describe "app" do
 
       describe "single user" do
         it "returns zeroes for missing user" do
-          check_social_stats(make_request(10000, DFLT_COURSE_ID), {"10000" => make_social_stats(0,0,0,0,0,0,0,0)})
+          check_social_stats(make_request(10000, DFLT_COURSE_ID), {"10000" => make_social_stats(0,0,0,0,0,0,0,0,0)})
         end
 
         it "returns zeroes for existing user with no activity" do
           thread = make_thread(@user1, "irrelevant text", DFLT_COURSE_ID, "irrelevant commentable_id")
-          check_social_stats(make_request(@user2.id, DFLT_COURSE_ID), {@user2.id => make_social_stats(0,0,0,0,0,0,0,0)})
+          check_social_stats(make_request(@user2.id, DFLT_COURSE_ID), {@user2.id => make_social_stats(0,0,0,0,0,0,0,0,0)})
         end
 
         [1,2].each do |thread_count|
           [0,3].each do |comment_count|
             [2,0,4].each do |reply_count|
               it "returns correct thread, comment, reply and comments generated count (#{thread_count}, #{comment_count}, #{reply_count})" do
-                check_social_stats(make_request(@user2.id, DFLT_COURSE_ID), {@user2.id => make_social_stats(0,0,0,0,0,0,0,0)})
+                check_social_stats(make_request(@user2.id, DFLT_COURSE_ID), {@user2.id => make_social_stats(0,0,0,0,0,0,0,0,0)})
 
                 fixed_thread = make_thread(@user2, "Fixed thread", DFLT_COURSE_ID, "fixed_thread")
                 fixed_comment = make_comment(@user2, fixed_thread, "fixed comemnt text")
 
-                check_social_stats(make_request(@user2.id, DFLT_COURSE_ID), {@user2.id => make_social_stats(1,1,0,0,0,0,1,0)})
+                check_social_stats(make_request(@user2.id, DFLT_COURSE_ID), {@user2.id => make_social_stats(1,1,0,0,0,0,1,0,0)})
 
                 thread_count.times {|i| make_thread(@user1, "text#{i}", DFLT_COURSE_ID, "commentable_id#{i}") }
                 comment_count.times {|i|  make_comment(@user1, fixed_thread, "comment#{i}") }
                 reply_count.times {|i| make_comment(@user1, fixed_comment, "response#{i}")}
 
                 # precondition - checking that user2 has only one thread and one comment - the fixed ones
-                check_social_stats(make_request(@user2.id, DFLT_COURSE_ID), {@user2.id => make_social_stats(1,1,0,0,0,0,comment_count+reply_count+1,0)})
+                check_social_stats(make_request(@user2.id, DFLT_COURSE_ID), {@user2.id => make_social_stats(1,1,0,0,0,0,comment_count+reply_count+1,0,0)})
 
-                check_social_stats(make_request(@user1.id, DFLT_COURSE_ID), {@user1.id => make_social_stats(thread_count,comment_count,reply_count,0,0,0,0,0)})
+                check_social_stats(make_request(@user1.id, DFLT_COURSE_ID), {@user1.id => make_social_stats(thread_count,comment_count,reply_count,0,0,0,0,0,0)})
               end
             end
           end
@@ -449,7 +451,7 @@ describe "app" do
           comment = make_comment(@user1, thread, "Comment1-1")
           reply = make_comment(@user1, comment, "Reply1-1-1")
 
-          check_social_stats(make_request(@user1.id, DFLT_COURSE_ID), {@user1.id => make_social_stats(1,1,1,0,0,0,2,0)})
+          check_social_stats(make_request(@user1.id, DFLT_COURSE_ID), {@user1.id => make_social_stats(1,1,1,0,0,0,2,0,0)})
         end
 
         it "returns correct upvotes and downvotes count" do
@@ -464,7 +466,7 @@ describe "app" do
           set_votes(@user1, "down", [thread2, comment1])
           set_flags(@user1, [thread1, thread2, comment1, reply2])
 
-          check_social_stats(make_request(@user2.id, DFLT_COURSE_ID), {@user2.id => make_social_stats(2,2,2,3,2,4,4,0)})
+          check_social_stats(make_request(@user2.id, DFLT_COURSE_ID), {@user2.id => make_social_stats(2,2,2,3,2,4,4,0,0)})
         end
 
         it "ignores self-upvotes and self-downvotes" do
@@ -475,7 +477,7 @@ describe "app" do
           set_votes(@user1, "up", [thread, comment, reply])
           set_votes(@user1, "down", [thread, comment, reply])
 
-          check_social_stats(make_request(@user1.id, DFLT_COURSE_ID), {@user1.id => make_social_stats(1,1,1,0,0,0,2,0)})
+          check_social_stats(make_request(@user1.id, DFLT_COURSE_ID), {@user1.id => make_social_stats(1,1,1,0,0,0,2,0,0)})
         end
 
         it "returns correct follower count" do 
@@ -483,7 +485,7 @@ describe "app" do
 
           subscribe(thread, [@user2, @user3])
 
-          check_social_stats(make_request(@user1.id, DFLT_COURSE_ID), {@user1.id => make_social_stats(1,0,0,0,0,0,0,2)})
+          check_social_stats(make_request(@user1.id, DFLT_COURSE_ID), {@user1.id => make_social_stats(1,0,0,0,0,0,0,2,0)})
         end
 
         it "ignores self-subscriptions" do 
@@ -491,7 +493,7 @@ describe "app" do
 
           subscribe(thread, [@user1])
 
-          check_social_stats(make_request(@user1.id, DFLT_COURSE_ID), {@user1.id => make_social_stats(1,0,0,0,0,0,0,0)})
+          check_social_stats(make_request(@user1.id, DFLT_COURSE_ID), {@user1.id => make_social_stats(1,0,0,0,0,0,0,0,0)})
         end
 
         it "ignores subscriptions to comments and replies" do 
@@ -502,7 +504,18 @@ describe "app" do
           subscribe(comment, [@user2])
           subscribe(reply, [@user2])
 
-          check_social_stats(make_request(@user1.id, DFLT_COURSE_ID), {@user1.id => make_social_stats(1,1,1,0,0,0,2,0)})
+          check_social_stats(make_request(@user1.id, DFLT_COURSE_ID), {@user1.id => make_social_stats(1,1,1,0,0,0,2,0,0)})
+        end
+
+        it "returns a count of how many threads have been read" do
+          thread = make_thread(@user1, "Some thread", DFLT_COURSE_ID, "Thread 1")
+          thread2 = make_thread(@user1, "Some other thread", DFLT_COURSE_ID, "Thread 2")
+          @user2.mark_as_read(thread)
+          check_social_stats(make_request(@user2.id, DFLT_COURSE_ID), {@user2.id => make_social_stats(0,0,0,0,0,0,0,0,1)})
+          @user2.mark_as_read(thread2)
+          check_social_stats(make_request(@user2.id, DFLT_COURSE_ID), {@user2.id => make_social_stats(0,0,0,0,0,0,0,0,2)})
+          # Make sure it also works when selecting all.
+          check_social_stats(make_request("*", DFLT_COURSE_ID), {@user2.id => make_social_stats(0,0,0,0,0,0,0,0,2)})
         end
 
         it "respects end_date parameter when calculating thread, comment, reply and comments generated counts" do
@@ -523,10 +536,10 @@ describe "app" do
             content.save!
           end
 
-          check_social_stats(make_request(@user1.id, DFLT_COURSE_ID), {@user1.id => make_social_stats(2,2,2,0,0,0,4,0)})
+          check_social_stats(make_request(@user1.id, DFLT_COURSE_ID), {@user1.id => make_social_stats(2,2,2,0,0,0,4,0,0)})
           # TODO: looks like a bug, but preserving it for now; comments generated should probably be 2, as comment1 and reply1 were created after end_date
-          check_social_stats(make_request(@user1.id, DFLT_COURSE_ID, DateTime.new(2015, 03, 01)), {@user1.id => make_social_stats(1,1,1,0,0,0,4,0)})
-          check_social_stats(make_request(@user1.id, DFLT_COURSE_ID, DateTime.new(2015, 02, 01)), {@user1.id => make_social_stats(0,0,0,0,0,0,0,0)})
+          check_social_stats(make_request(@user1.id, DFLT_COURSE_ID, DateTime.new(2015, 03, 01)), {@user1.id => make_social_stats(1,1,1,0,0,0,4,0,0)})
+          check_social_stats(make_request(@user1.id, DFLT_COURSE_ID, DateTime.new(2015, 02, 01)), {@user1.id => make_social_stats(0,0,0,0,0,0,0,0,0)})
         end
 
         it "respects thread_type parameter when calculating thread, comment, reply and comments generated counts" do
@@ -538,9 +551,9 @@ describe "app" do
           reply1 = make_comment(@user1, comment1, "Reply1-1-1")
           reply2 = make_comment(@user1, comment2, "Reply1-2-1")
 
-          check_social_stats(make_request(@user1.id, DFLT_COURSE_ID, nil), {@user1.id => make_social_stats(2,3,2,0,0,0,5,0)})
-          check_social_stats(make_request(@user1.id, DFLT_COURSE_ID, nil, :discussion), {@user1.id => make_social_stats(1,1,1,0,0,0,2,0)})
-          check_social_stats(make_request(@user1.id, DFLT_COURSE_ID, nil, :question), {@user1.id => make_social_stats(1,2,1,0,0,0,3,0)})
+          check_social_stats(make_request(@user1.id, DFLT_COURSE_ID, nil), {@user1.id => make_social_stats(2,3,2,0,0,0,5,0,0)})
+          check_social_stats(make_request(@user1.id, DFLT_COURSE_ID, nil, :discussion), {@user1.id => make_social_stats(1,1,1,0,0,0,2,0,0)})
+          check_social_stats(make_request(@user1.id, DFLT_COURSE_ID, nil, :question), {@user1.id => make_social_stats(1,2,1,0,0,0,3,0,0)})
         end
       end
 
@@ -572,8 +585,8 @@ describe "app" do
 
         it "returns correct stats for all users" do
           check_social_stats(make_request('*', DFLT_COURSE_ID), {
-            @user1.id => make_social_stats(1,1,2,3,0,4,5,1),
-            @user2.id => make_social_stats(2,3,1,5,0,3,2,3),
+            @user1.id => make_social_stats(1,1,2,3,0,4,5,1,0),
+            @user2.id => make_social_stats(2,3,1,5,0,3,2,3,0),
           })
         end
 
@@ -594,42 +607,42 @@ describe "app" do
           end
 
           check_social_stats(make_request('*', DFLT_COURSE_ID), {
-            @user1.id => make_social_stats(1,1,2,3,0,4,5,1),
-            @user2.id => make_social_stats(2,3,1,5,0,3,2,3),
+            @user1.id => make_social_stats(1,1,2,3,0,4,5,1,0),
+            @user2.id => make_social_stats(2,3,1,5,0,3,2,3,0),
           })
 
           make_request('*', DFLT_COURSE_ID, DateTime.new(2015, 02, 01)).should == {}
 
           check_social_stats(make_request('*', DFLT_COURSE_ID, DateTime.new(2015, 03, 01)), {
-            @user1.id => make_social_stats(1,0,1,3,0,3,5,0),
-            @user2.id => make_social_stats(0,1,0,0,0,1,0,0),
+            @user1.id => make_social_stats(1,0,1,3,0,3,5,0,0),
+            @user2.id => make_social_stats(0,1,0,0,0,1,0,0,0),
           })
 
           check_social_stats(make_request('*', DFLT_COURSE_ID, DateTime.new(2015, 03, 13)), {
-            @user1.id => make_social_stats(1,0,1,3,0,3,5,1),
-            @user2.id => make_social_stats(1,2,1,3,0,3,1,2),
+            @user1.id => make_social_stats(1,0,1,3,0,3,5,1,0),
+            @user2.id => make_social_stats(1,2,1,3,0,3,1,2,0),
           })
 
           check_social_stats(make_request('*', DFLT_COURSE_ID, DateTime.new(2015, 03, 25)), {
-            @user1.id => make_social_stats(1,1,2,3,0,4,5,1),
-            @user2.id => make_social_stats(2,3,1,5,0,3,2,3),
+            @user1.id => make_social_stats(1,1,2,3,0,4,5,1,0),
+            @user2.id => make_social_stats(2,3,1,5,0,3,2,3,0),
           })
         end
 
         it "filters by thread_type" do
           check_social_stats(make_request('*', DFLT_COURSE_ID, nil), {
-            @user1.id => make_social_stats(1,1,2,3,0,4,5,1),
-            @user2.id => make_social_stats(2,3,1,5,0,3,2,3),
+            @user1.id => make_social_stats(1,1,2,3,0,4,5,1,0),
+            @user2.id => make_social_stats(2,3,1,5,0,3,2,3,0),
           })
 
           check_social_stats(make_request('*', DFLT_COURSE_ID, nil, :discussion), {
-            @user1.id => make_social_stats(1,0,2,3,0,3,5,1),
-            @user2.id => make_social_stats(1,3,1,4,0,3,1,2),
+            @user1.id => make_social_stats(1,0,2,3,0,3,5,1,0),
+            @user2.id => make_social_stats(1,3,1,4,0,3,1,2,0),
           })
 
           check_social_stats(make_request('*', DFLT_COURSE_ID, nil, :question), {
-            @user1.id => make_social_stats(0,1,0,0,0,1,0,0),
-            @user2.id => make_social_stats(1,0,0,1,0,0,1,1),
+            @user1.id => make_social_stats(0,1,0,0,0,1,0,0,0),
+            @user2.id => make_social_stats(1,0,0,1,0,0,1,1,0),
           })
         end
       end
