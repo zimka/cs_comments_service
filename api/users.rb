@@ -167,11 +167,7 @@ get "#{APIPREFIX}/users/:user_id/social_stats" do |user_id|
 
     # with the array of objectId's for threads, get a count of number of other users who have a subscription on it
     user_stats.keys.each do |user_id|
-      if end_date then
-        user_stats[user_id]["num_thread_followers"] = Subscription.where(:subscriber_id.ne => user_id, :source_id.in => thread_ids[user_id], :created_at.lte => (end_date)).count()
-      else
-        user_stats[user_id]["num_thread_followers"] = Subscription.where(:subscriber_id.ne => user_id, :source_id.in => thread_ids[user_id]).count()
-      end
+      user_stats[user_id]["num_thread_followers"] = Subscription.where(:subscriber_id.ne => user_id, :source_id.in => thread_ids[user_id]).count()
     end
 
     # Get the number of threads read by each user.
