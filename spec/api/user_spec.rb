@@ -666,7 +666,7 @@ describe "app" do
           make_request('*', DFLT_COURSE_ID, DateTime.new(2015, 02, 01)).should == {}
 
           check_social_stats(make_request('*', DFLT_COURSE_ID, DateTime.new(2015, 03, 01)), {
-            @user1.id => make_social_stats(1,0,1,3,0,3,5,0,0),
+            @user1.id => make_social_stats(1,0,1,3,0,3,5,1,0),
             @user2.id => make_social_stats(0,1,0,0,0,1,0,0,0),
           })
 
