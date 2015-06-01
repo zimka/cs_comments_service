@@ -412,13 +412,16 @@ describe "app" do
         }
       end
 
-      def make_request(user_id, course_id, end_date=nil, thread_type=nil)
+      def make_request(user_id, course_id, end_date=nil, thread_type=nil, thread_ids=nil)
         parameters = { :course_id => course_id}
         if end_date
           parameters['end_date'] = end_date
         end
         if thread_type
           parameters['thread_type'] = thread_type
+        end
+        if thread_ids
+          parameters['thread_ids'] = thread_ids.join(",")
         end
 
         get "/api/v1/users/#{user_id}/social_stats", parameters
@@ -695,6 +698,21 @@ describe "app" do
           check_social_stats(make_request('*', DFLT_COURSE_ID, nil, :question), {
             @user1.id => make_social_stats(0,1,0,0,0,1,0,0,0),
             @user2.id => make_social_stats(1,0,0,1,0,0,1,1,0),
+          })
+        end
+
+        it "filters by thread ids" do
+          check_social_stats(make_request('*', DFLT_COURSE_ID, nil, nil, ["Thread 1"]), {
+            @user1.id => make_social_stats(1,0,2,3,0,3,5,1,0),
+            @user2.id => make_social_stats(0,2,1,1,0,2,0,0,0),
+          })
+          check_social_stats(make_request('*', DFLT_COURSE_ID, nil, nil, ["Thread 2"]), {
+            @user1.id => make_social_stats(0,1,0,0,0,1,0,0,0),
+            @user2.id => make_social_stats(2,1,0,4,0,1,2,3,0),
+          })
+          check_social_stats(make_request('*', DFLT_COURSE_ID, nil, nil, ["Thread 1", "Thread 2"]), {
+            @user1.id => make_social_stats(1,1,2,3,0,4,5,1,0),
+            @user2.id => make_social_stats(2,3,1,5,0,3,2,3,0),
           })
         end
       end
