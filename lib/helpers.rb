@@ -10,7 +10,7 @@ helpers do
     raise ArgumentError, t(:user_id_is_required) unless @user || params[:user_id]
     @user ||= User.find_by(external_id: params[:user_id])
   end
-  
+
   def thread
     @thread ||= CommentThread.find(params[:thread_id])
   end
@@ -56,7 +56,7 @@ helpers do
     obj.save
     obj.reload.to_hash.to_json
   end
-  
+
   def un_flag_as_abuse(obj)
     raise ArgumentError, t(:user_id_is_required) unless user
     if params["all"]
@@ -66,7 +66,7 @@ helpers do
     else
       obj.abuse_flaggers.delete user.id
     end
-    
+
     obj.save
     obj.reload.to_hash.to_json
   end
@@ -78,7 +78,7 @@ helpers do
     end
     obj.reload.to_hash.to_json
   end
-  
+
 
   def pin(obj)
     raise ArgumentError, t(:user_id_is_required) unless user
@@ -86,16 +86,16 @@ helpers do
     obj.save
     obj.reload.to_hash.to_json
   end
-  
+
   def unpin(obj)
     raise ArgumentError, t(:user_id_is_required) unless user
     obj.pinned = nil
     obj.save
     obj.reload.to_hash.to_json
-  end  
-  
-  
-  
+  end
+
+
+
   def value_to_boolean(value)
     !!(value.to_s =~ /^true$/i)
   end
@@ -158,7 +158,7 @@ helpers do
         comment_ids = Comment.where(:course_id => course_id).
           where(:abuse_flaggers.ne => [], :abuse_flaggers.exists => true).
           collect{|c| c.comment_thread_id}.uniq
-          
+
         thread_ids = comment_threads.where(:abuse_flaggers.ne => [], :abuse_flaggers.exists => true).
           collect{|c| c.id}
 
@@ -171,7 +171,7 @@ helpers do
         endorsed_thread_ids = Comment.where(:course_id => course_id).
           where(:parent_id.exists => false, :endorsed => true).
           collect{|c| c.comment_thread_id}.uniq
-          
+
         comment_threads = comment_threads.where({"thread_type" => :question}).nin({"_id" => endorsed_thread_ids})
       end
     end
@@ -217,7 +217,7 @@ helpers do
 
         # The following trick makes frontend pagers work without recalculating
         # the number of all unread threads per user on every request (since the number
-        # of threads in a course could be tens or hundreds of thousands).  It has the 
+        # of threads in a course could be tens or hundreds of thousands).  It has the
         # effect of showing that there's always just one more page of results, until
         # there definitely are no more pages.  This is really only acceptable for pagers
         # that don't actually reveal the total number of pages to the user onscreen.
@@ -228,7 +228,7 @@ helpers do
         page = [1, page].max
         threads = comment_threads.paginate(:page => page, :per_page => per_page).to_a
       end
-      
+
       if threads.length == 0
         collection = []
       else
@@ -328,11 +328,11 @@ helpers do
       current_thread = thread_map[c.comment_thread_id]
 
       #do not include threads or comments who have current or historical abuse flags
-      if current_thread.abuse_flaggers.to_a.empty? and 
-        current_thread.historical_abuse_flaggers.to_a.empty? and 
-        c.abuse_flaggers.to_a.empty? and 
+      if current_thread.abuse_flaggers.to_a.empty? and
+        current_thread.historical_abuse_flaggers.to_a.empty? and
+        c.abuse_flaggers.to_a.empty? and
         c.historical_abuse_flaggers.to_a.empty?
-        
+
           user_ids = subscriptions_map[c.comment_thread_id.to_s]
           user_ids.each do |u|
             if not notification_map.keys.include? u
@@ -377,12 +377,12 @@ helpers do
       return
     end
     if CommentService.blocked_hashes.include? hash then
-      msg = t(:blocked_content_with_body_hash, :hash => hash) 
+      msg = t(:blocked_content_with_body_hash, :hash => hash)
       logger.warn msg
       error 503, [msg].to_json
     end
   end
-  
+
   include ::NewRelic::Agent::MethodTracer
   add_method_tracer :user
   add_method_tracer :thread
