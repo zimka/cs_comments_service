@@ -564,6 +564,18 @@ describe "app" do
       end
 
 
+      it "marks thread as read and confirms its value on returned response" do
+        user = create_test_user(123)
+        thread = CommentThread.first
+        user.mark_as_read(thread)
+        get "/api/v1/threads/#{thread.id}", user_id: user.id
+        last_response.should be_ok
+        json_response = parse(last_response.body)
+        changed_thread = CommentThread.find(thread.id)
+        check_thread_result_json(user, changed_thread, json_response)
+        json_response["read"].should == true
+      end
+
       def test_unicode_data(text)
         thread = create(:comment_thread, body: text)
         create(:comment, comment_thread: thread, body: text)
