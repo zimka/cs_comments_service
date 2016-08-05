@@ -565,7 +565,6 @@ describe "app" do
 
       it "marks thread as read and confirms its value on returned response" do
         user = create_test_user(123)
-        thread = CommentThread.first
         user.mark_as_read(thread)
         get "/api/v1/threads/#{thread.id}", user_id: user.id
         last_response.should be_ok
