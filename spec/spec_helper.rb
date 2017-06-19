@@ -10,6 +10,7 @@ end
 require File.join(File.dirname(__FILE__), '..', 'app')
 
 require 'rack/test'
+require 'rspec/its'
 require 'sinatra'
 require 'yajl'
 
