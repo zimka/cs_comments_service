@@ -232,7 +232,7 @@ DEPENDENCIES
   mongoid-tree!
   mongoid_cleaner (~> 1.2.0)
   mongoid_magic_counter_cache
-  newrelic_rpm (~> 3.16.0)
+  newrelic_rpm
   nokogiri (~> 1.6.8)
   protected_attributes
   pry
@@ -257,4 +257,4 @@ RUBY VERSION
    ruby 2.4.1p111
 
 BUNDLED WITH
-   1.15.1
+   1.15.2

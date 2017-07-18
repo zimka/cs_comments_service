@@ -53,8 +53,7 @@ group :test do
   gem 'webmock', '~> 3.0.1'
 end
 
-# FIXME Remove version restriction once ruby upgraded to 2.x
-gem 'newrelic_rpm', '~> 3.16.0'
+gem 'newrelic_rpm'
 gem 'unicorn'
 gem "rack-timeout"
 gem "i18n"
