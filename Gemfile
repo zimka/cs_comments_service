@@ -50,6 +50,7 @@ group :test do
   gem 'rack-test', :require => 'rack/test'
   gem 'rspec', '~> 3.6.0'
   gem 'rspec-its'
+  gem 'rspec-collection_matchers'
   gem 'webmock', '~> 3.0.1'
 end
 

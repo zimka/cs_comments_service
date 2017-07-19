@@ -11,6 +11,7 @@ require File.join(File.dirname(__FILE__), '..', 'app')
 
 require 'rack/test'
 require 'rspec/its'
+require 'rspec/collection_matchers'
 require 'sinatra'
 require 'yajl'
 
