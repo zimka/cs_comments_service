@@ -9,6 +9,7 @@ class User
   field :external_id, type: String
   field :username, type: String
   field :default_sort_key, type: String, default: "date"
+  field :full_name, type: String, default: -> { username }
 
   embeds_many :read_states
   has_many :comments, inverse_of: :author
@@ -18,6 +19,7 @@ class User
 
   validates_presence_of :external_id
   validates_presence_of :username
+  validates_presence_of :full_name
   validates_uniqueness_of :external_id
   validates_uniqueness_of :username
 

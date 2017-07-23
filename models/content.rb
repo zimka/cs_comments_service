@@ -71,7 +71,7 @@ class Content
 
   def self.summary what
     #take a hash of criteria (what) and return a hash of hashes
-    #of total users, votes, comments, endorsements, 
+    #of total users, votes, comments, endorsements,
 
     answer = {}
     vote_count = 0
@@ -109,6 +109,12 @@ class Content
 
   def set_username
     # avoid having to look this attribute up later, since it does not change
-    self.author_username = author.username
+    if !(author.attributes.has_key?('full_name'))
+      self.author_username = author.username
+    elsif !(author.full_name)
+      self.author_username = author.username
+    else
+      self.author_username = author.full_name
+    end
   end
 end

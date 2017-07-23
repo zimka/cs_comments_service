@@ -67,7 +67,7 @@ end
 
 put "#{APIPREFIX}/users/:user_id" do |user_id|
   user = User.find_or_create_by(external_id: user_id)
-  user.update_attributes(params.slice(*%w[username default_sort_key]))
+  user.update_attributes(params.slice(*%w[username full_name default_sort_key]))
   if user.errors.any?
     error 400, user.errors.full_messages.to_json
   else
