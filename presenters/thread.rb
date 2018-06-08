@@ -78,6 +78,7 @@ class ThreadPresenter
   #     The total number of responses
   def get_paged_merged_responses(thread_id, responses, skip, limit, recursive=false)
     response_ids = responses.only(:_id).sort({"sk" => 1}).to_a.map{|doc| doc["_id"]}
+    response_ids = response_ids.reverse
     paged_response_ids = limit.nil? ? response_ids.drop(skip) : response_ids.drop(skip).take(limit)
     if recursive
       content = Comment.where(comment_thread_id: thread_id).
@@ -117,7 +118,7 @@ class ThreadPresenter
         end
       end
     end
-    top_level
+    top_level.reverse
   end
 
   include ::NewRelic::Agent::MethodTracer
